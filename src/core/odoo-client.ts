@@ -11,12 +11,12 @@ class OdooClient {
     const isSecure = config.odoo.url.startsWith("https");
     const createClient = isSecure ? xmlrpc.createSecureClient : xmlrpc.createClient;
     
-    // Configuración para autenticación
+    //autentificacion
     this.commonClient = createClient({
       url: `${config.odoo.url}/xmlrpc/2/common`,
     });
 
-    // Configuración para ejecución de comandos
+    //ejecucion de comandos
     this.objectClient = createClient({
       url: `${config.odoo.url}/xmlrpc/2/object`,
     });
@@ -24,6 +24,30 @@ class OdooClient {
 
   //login y uid
   async connect(): Promise<void> {
+
+
+    //LIMPIEZA AGRESIVA DEL URL
+    const cleanUrl = config.odoo.url.trim().replace(/\/$/, ""); 
+
+
+    console.error(`Intentando conectar a: '${cleanUrl}'`); 
+    
+   
+    const commonUrl = `${cleanUrl}/xmlrpc/2/common`;
+    const objectUrl = `${cleanUrl}/xmlrpc/2/object`;
+
+   
+    const createClient = cleanUrl.startsWith("https") 
+      ? xmlrpc.createSecureClient 
+      : xmlrpc.createClient;
+
+    
+    this.commonClient = createClient(commonUrl);
+    this.objectClient = createClient(objectUrl);
+
+
+
+
     console.error(`Connecting to Odoo at ${config.odoo.url}...`);
 
     return new Promise((resolve, reject) => {
@@ -67,7 +91,7 @@ class OdooClient {
       throw new Error("Client not connected. Call connect() first.");
     }
 
-    // Estructura oficial de Odoo execute_kw:
+    //structura oficial de Odoo execute_kw:
     // [db, uid, password, model, method, [args], {kwargs}]
     const payload = [
       config.odoo.db,
