@@ -30,7 +30,7 @@ describe('Integración Real con Odoo (E2E)', () => {
       }
     );
 
-    console.log("Dato real recuperado:", users[0]?.name);
+    console.log("Dato real recuperado");
 
     expect(Array.isArray(users)).toBe(true);
     expect(users.length).toBeGreaterThan(0);

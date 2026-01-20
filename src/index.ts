@@ -1,11 +1,13 @@
 #!/usr/bin/env node
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
-import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { CallToolRequestSchema, ListToolsRequestSchema } from "@modelcontextprotocol/sdk/types.js";
-import { odooClient } from "./core/odoo-client.js"; // Importamos tu cliente
+import { odooClient } from "./core/odoo-client.js";
+import cors from "cors";
+import express from "express";
 
 //Modulos a usar
 import { projectsTools } from "./modules/projects/tools.js";
+import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
 
 // Configuración del Servidor MCP
 const server = new Server(
@@ -49,22 +51,62 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
   return handler(request.params.arguments);
 });
 
-// Función Principal (Main)
-async function main() {
-  try {
-    console.error("🔌 Conectando a Odoo...");
-    await odooClient.connect(); // Conexión inicial
-    console.error("✅ Odoo Conectado.");
 
-    const transport = new StdioServerTransport();
-    await server.connect(transport);
+const app = express();
+app.use(cors());
+const transports = new Map<string, SSEServerTransport>();
+app.get("/sse", async (req, res) => {
+
+  const transport = new SSEServerTransport("/messages", res);
+  await server.connect(transport);
+
+  transports.set(transport.sessionId, transport);
+
+  console.log("SSE sesion connected:" + transport.sessionId);
+  
+  req.on("close", () => {
+    console.log("SSE sesion closed:" + transport.sessionId);
+    transports.delete(transport.sessionId);
+    transport.close();
+  });
+});
+
+app.post("/messages", async (req, res)=>{
+  const sessionId = req.query.sessionId as string;
+
+  if(!sessionId){
+    res.status(400).send("SessionId not included in req")
+    return;
+  }
+
+  const transport = transports.get(sessionId);
+
+    //caso directamente al message sin pasar por sse
+  if(!transport){
+    res.status(404).send("Session not found or inactive")
+    return;
+  }
+  //delegar al transport correcto
+  await transport.handlePostMessage(req,res);
+
+});
+
+async function startServer(){
+  try{
+    await odooClient.connect();
     
-    console.error("🚀 Servidor MCP listo y escuchando.");
-    
-  } catch (error) {
-    console.error("❌ Error fatal al iniciar:", error);
-    process.exit(1);
+    const PORT = process.env.PORT || 3000;
+    app.listen(PORT, ()=>{
+      console.log(`MCP server runnign in htpp://localhost:${PORT}`)
+    });
+  } catch(error){
+      console.error("fatal error: ",error)
+      process.exit(1);
   }
 }
 
-main();
+export {app};
+
+if (import.meta.url ===`file://${process.argv[1]}`){
+  startServer();
+}
