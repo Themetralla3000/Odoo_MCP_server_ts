@@ -37,8 +37,10 @@ export class ProjectsService {
     const domain: any[] = [];
     
     if (stageName) {
-      //provar si se puede hacer asi en vez de stageId
-      domain.push(["stage_id", "ilike", stageName]);
+      const stageId = this.resolveStageId(stageName);
+      if(stageId){
+        domain.push(["stage_id","=",stageId]);
+      }
     }
 
     const fields = [
@@ -69,7 +71,6 @@ export class ProjectsService {
         order: "create_date desc"
       }
     );
-
     return results;
   }
 }
