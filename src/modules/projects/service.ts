@@ -1,7 +1,35 @@
 import { odooClient } from "../../core/odoo-client.js";
 
 export class ProjectsService {
-  
+  //funcion para mapear el stage name a stage id
+  private static resolveStageId(stageName: string): number | null{
+
+    const cleanName = stageName.toLowerCase().replace(/\s+/g,"");
+
+    const map: Record<string,number> = {
+      // ID 5: Todo
+      "todo": 5,
+      "togo": 5, // typo común
+
+      // ID 6: Doing
+      "doing": 6,
+      "haciendo": 6,
+      "proceso": 6,
+
+      // ID 7: Done
+      "done": 7,
+      "hecho": 7,
+      "acabado": 7,
+
+      // ID 8: Pendiente de cierre
+      "pendientedecierre": 8,
+      "pendiente": 8, // Alias corto
+      "cierre": 8     // Alias corto
+    };
+      return map[cleanName] || null;
+  }
+
+
   static async getProjects(stageName?: string, limit: number = 20) {
     console.log(`Buscando proyectos. Etapa: ${stageName || "Cualquiera"}`);
 
