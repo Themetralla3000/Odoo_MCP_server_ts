@@ -2,11 +2,15 @@
   "name": "mcp_js",
   "version": "1.0.0",
   "type": "module",
-  "main": "build/index.js",
+  "main": "build/src/index.js",
   "scripts": {
     "build": "tsc",
-    "dev": "tsc && node build/index.js",
-    "start": "node build/index.js",
+    "dev": "tsc && node build/src/index.js",
+
+    "start": "node build/src/index.js",
+    "start:sse": "node build/src/index.js --sse",
+    "start:stdio": "node build/src/index.js",
+
     "test": "vitest run",
     "test:watch": "vitest",
     "coverage": "vitest run --coverage"

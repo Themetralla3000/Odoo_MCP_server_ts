@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import request from "supertest";
-import { app } from "../../src/index.js"; //se importa pero no se arranca
+import { createHttpServer } from "../../src/index.js"; //se importa pero no se arranca
 
 //MOCK: hacer ver que se conecta a odoo
 vi.mock("../../src/core/odoo-client.js", () => ({
@@ -11,6 +11,7 @@ vi.mock("../../src/core/odoo-client.js", () => ({
 
 describe("Servidor MCP HTTP (Express)", () => {
   //TEST: verificar validación de SessionID (POST /messages)
+  const app = createHttpServer();
   it("POST /messages -> Debería fallar si no hay sessionId", async () => {
     await request(app)
       .post("/messages") 

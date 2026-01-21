@@ -32,9 +32,52 @@ function createOdooServer() {
 
   return server;
 }
+//exportada para los tests
+export function createHttpServer() {
+  const app = express();
+  app.use(cors());
+
+  // El mapa de transportes vive dentro de esta instancia de la app
+  const transports = new Map<string, SSEServerTransport>();
+
+  app.get("/sse", async (req, res) => {
+    console.log("🔌 Nueva conexión SSE entrante...");
+    const server = createOdooServer();
+    const transport = new SSEServerTransport("/messages", res);
+    
+    await server.connect(transport);
+    transports.set(transport.sessionId, transport);
+
+    req.on("close", () => {
+      transports.delete(transport.sessionId);
+      server.close();
+    });
+  });
+
+  app.post("/messages", async (req, res) => {
+    const sessionId = req.query.sessionId as string;
+
+    if (!sessionId) {
+      res.status(400).send("SessionId required");
+      return;
+    }
+    
+    const transport = transports.get(sessionId);
+    if (!transport) {
+      res.status(404).send("Session not found");
+      return;
+    }
+    await transport.handlePostMessage(req, res);
+  });
+
+  return app;
+}
 
 
 async function startServer() {
+  
+  if (process.env.NODE_ENV === 'test') return;
+
   try {
     await odooClient.connect();
 
@@ -43,44 +86,13 @@ async function startServer() {
 
     if (mode === "sse") {
       // modo sse
-      const app = express();
-      app.use(cors());
-
-      const transports = new Map<string, SSEServerTransport>();
-
-      app.get("/sse", async (req, res) => {
-        console.log("🔌 Nueva conexión SSE entrante...");
-        
-        const server = createOdooServer();
-        
-        const transport = new SSEServerTransport("/messages", res);
-        
-        await server.connect(transport);
-        transports.set(transport.sessionId, transport);
-          console.log("SSE sesion connected:" + transport.sessionId);
-        req.on("close", () => {
-          console.log("SSE sesion closed:" + transport.sessionId);
-          transports.delete(transport.sessionId);
-          server.close(); 
-        });
+      const app = createHttpServer()
+      const PORT = process.env.PORT;
+      app.listen(PORT, ()=>{
+          console.log(`Server running in SSE mode on port ${PORT}`);
       });
 
-      app.post("/messages", async (req, res) => {
-        const sessionId = req.query.sessionId as string;
-        const transport = transports.get(sessionId);
-        
-        if (!transport) {
-          res.status(404).send("Session not found");
-          return;
-        }
-        await transport.handlePostMessage(req, res);
-      });
-
-      const PORT = process.env.PORT || 3000;
-      app.listen(PORT, () => {
-        console.log(`Server running in SSE mode on port ${PORT}`);
-      });
-
+      
     } else {
       //modo stdio
       const server = createOdooServer();
