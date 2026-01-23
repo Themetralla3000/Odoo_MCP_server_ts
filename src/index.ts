@@ -1,18 +1,17 @@
 #!/usr/bin/env node
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { CallToolRequestSchema, ListToolsRequestSchema } from "@modelcontextprotocol/sdk/types.js";
-import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
 import { odooClient } from "./core/odoo-client.js";
 import { registerAllTools } from "./all-tools.js";
 import express from "express";
 import cors from "cors";
-
+//para los tests
+import { fileURLToPath } from 'url';
 
 const toolHandlers = new Map<string, Function>();
 const toolDefinitions: any[] = [];
 registerAllTools(toolHandlers, toolDefinitions);
-
 
 function createOdooServer() {
   const server = new Server(
@@ -32,18 +31,17 @@ function createOdooServer() {
 
   return server;
 }
-//exportada para los tests
+//exportada para los test
 export function createHttpServer() {
   const app = express();
   app.use(cors());
 
-  // El mapa de transportes vive dentro de esta instancia de la app
   const transports = new Map<string, SSEServerTransport>();
 
   app.get("/sse", async (req, res) => {
-    console.log("🔌 Nueva conexión SSE entrante...");
+    console.log("New sse conexion");
     const server = createOdooServer();
-    const transport = new SSEServerTransport("/messages", res);
+    const transport = new SSEServerTransport("/mcp/messages", res);
     
     await server.connect(transport);
     transports.set(transport.sessionId, transport);
@@ -56,12 +54,10 @@ export function createHttpServer() {
 
   app.post("/messages", async (req, res) => {
     const sessionId = req.query.sessionId as string;
-
     if (!sessionId) {
       res.status(400).send("SessionId required");
       return;
     }
-    
     const transport = transports.get(sessionId);
     if (!transport) {
       res.status(404).send("Session not found");
@@ -73,37 +69,42 @@ export function createHttpServer() {
   return app;
 }
 
-
 async function startServer() {
-  
-  if (process.env.NODE_ENV === 'test') return;
-
   try {
+    console.log("Iniciando conexión con Odoo...");
     await odooClient.connect();
+    console.log("Conexión con Odoo establecida.");
 
-    const args = process.argv.slice(2);
-    const mode = args.includes("--sse") ? "sse" : "stdio";
+    const app = createHttpServer();
+    const PORT = process.env.PORT || 3000;
+    
+    console.log(`Levantando servidor en el puerto: ${PORT}...`);
 
-    if (mode === "sse") {
-      // modo sse
-      const app = createHttpServer()
-      const PORT = process.env.PORT;
-      app.listen(PORT, ()=>{
-          console.log(`Server running in SSE mode on port ${PORT}`);
-      });
+    // Guardamos la instancia del servidor
+    const httpServer = app.listen(Number(PORT), "0.0.0.0", () => {
+      console.log(`Server running in SSE mode on port ${PORT}`);
+    });
 
-      
-    } else {
-      //modo stdio
-      const server = createOdooServer();
-      const transport = new StdioServerTransport();
-      await server.connect(transport);
-    }
+    // IMPORTANTE: Escuchar errores de arranque (puerto ocupado, permisos, etc)
+    httpServer.on('error', (e: any) => {
+        if (e.code === 'EADDRINUSE') {
+            console.error(`ERROR: El puerto ${PORT} esta ocupado por otro proceso.`);
+        } else if (e.code === 'EACCES') {
+            console.error(`ERROR: no tienes permiso para usar el puerto ${PORT}.`);
+        } else {
+            console.error('error en el servidor HTTP:', e);
+        }
+        process.exit(1);
+    });
 
   } catch (error) {
-    console.error("Fatal error:", error);
+    console.error("fatal error en startServer:", error);
     process.exit(1);
   }
 }
 
-startServer();
+const isMainModule = process.argv[1] === fileURLToPath(import.meta.url);
+
+if (isMainModule) {
+    startServer();
+}
