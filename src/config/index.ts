@@ -1,8 +1,12 @@
 import { z } from "zod";
 import dotenv from "dotenv";
+import path from "path";
 
+const env = process.env.NODE_ENV || "dev";
 //cargar .env
-dotenv.config();
+dotenv.config({
+  path:path.resolve(process.cwd(), `.env.${env}`)
+});
 
 const envSchema = z.object({
   ODOO_URL: z.string().url(),

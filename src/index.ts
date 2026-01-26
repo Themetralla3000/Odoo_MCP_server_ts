@@ -52,7 +52,7 @@ export function createHttpServer() {
     });
   });
 
-  app.post("/messages", async (req, res) => {
+  app.post(["/messages", "/mcp/messages"], async (req, res) => {
     const sessionId = req.query.sessionId as string;
     if (!sessionId) {
       res.status(400).send("SessionId required");
