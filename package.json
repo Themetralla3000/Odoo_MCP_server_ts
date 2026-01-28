@@ -5,8 +5,8 @@
   "main": "build/src/index.js",
   "scripts": {
     "build": "tsc",
-    "dev": "cross-env NODE_ENV=dev tsc && node build/src/index.js",
-    "start": "cross-env NODE_ENV=prod node build/src/index.js",
+   "dev": "cross-env NODE_ENV=dev ts-node build/src/index.js", 
+  "start": "cross-env NODE_ENV=prod node build/src/index.js",
     "test": "cross-env NODE_ENV=test vitest run",
     "test:watch": "cross-env NODE_ENV=test vitest",
     "coverage": "cross-env NODE_ENV=test vitest run --coverage"
