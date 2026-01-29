@@ -1,14 +1,16 @@
 #!/usr/bin/env node
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { CallToolRequestSchema, ListToolsRequestSchema } from "@modelcontextprotocol/sdk/types.js";
-import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
+import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
+import { isInitializeRequest } from "@modelcontextprotocol/sdk/types.js";
 import { odooClient } from "./core/odoo-client.js";
 import { registerAllTools } from "./all-tools.js";
 import express from "express";
 import cors from "cors";
-//para los tests
+import { randomUUID } from "crypto";
 import { fileURLToPath } from 'url';
 
+//registre de tools -- igual que en sse
 const toolHandlers = new Map<string, Function>();
 const toolDefinitions: any[] = [];
 registerAllTools(toolHandlers, toolDefinitions);
@@ -31,39 +33,122 @@ function createOdooServer() {
 
   return server;
 }
-//exportada para los test
+
 export function createHttpServer() {
   const app = express();
   app.use(cors());
+  app.use(express.json());
 
-  const transports = new Map<string, SSEServerTransport>();
+  // Emmagatzematge de sessions actives
+  const sessions = new Map<string, {
+    server: Server;
+    transport: StreamableHTTPServerTransport; //en comptes de sse
+  }>();
 
-  app.get("/sse", async (req, res) => {
-    console.log("New sse conexion");
-    const server = createOdooServer();
-    const transport = new SSEServerTransport("/mcp/messages", res);
-    
-    await server.connect(transport);
-    transports.set(transport.sessionId, transport);
+  /*
+  Unic endpoint "/mcp" (abans /sse + /messages)
 
-    req.on("close", () => {
-      transports.delete(transport.sessionId);
-      server.close();
+  */
+  app.post("/mcp", async (req, res) => {
+    const sessionId = req.headers['mcp-session-id'] as string | undefined;
+
+    //cas 1: nova sessió ( Post "/mcp {initialize}")
+    if (isInitializeRequest(req.body) && !sessionId) {
+      console.log("New MCP session request");
+
+      const server = createOdooServer();
+      const transport = new StreamableHTTPServerTransport({
+        sessionIdGenerator: () => randomUUID(),
+        onsessioninitialized: (id) => {
+          console.log(`Session initialized: ${id}`);
+          sessions.set(id, { server, transport });
+        },
+      });
+      //tancar sessió
+      res.on('close', () => {
+        const sid = transport.sessionId;
+        if (sid) {
+          console.log(`Connexion closed for session: ${sid}`);
+        }
+      });
+
+      await server.connect(transport);
+      await transport.handleRequest(req, res, req.body);
+      return;
+    }
+
+    //cas 2: sessió existent 
+    if (sessionId) {
+      const session = sessions.get(sessionId);
+
+      if (!session) {
+        res.status(404).json({
+          jsonrpc: '2.0',
+          error: { code: -32001, message: 'Session not found' },
+          id: req.body?.id || null,
+        });
+        return;
+      }
+
+      await session.transport.handleRequest(req, res, req.body);
+      return;
+    }
+
+    //cas 3: sense session id i no es {initialize}
+    res.status(400).json({
+      jsonrpc: '2.0',
+      error: { code: -32002, message: 'Mcp-Session-Id required' },
+      id: req.body?.id || null,
     });
   });
 
-  app.post(["/messages", "/mcp/messages"], async (req, res) => {
-    const sessionId = req.query.sessionId as string;
+  //GET /mcp -> canal sse per notificacions
+  app.get("/mcp", async (req, res) => {
+    const sessionId = req.headers['mcp-session-id'] as string;
+
     if (!sessionId) {
-      res.status(400).send("SessionId required");
+      res.status(400).json({ error: 'Mcp-Session-Id required' });
       return;
     }
-    const transport = transports.get(sessionId);
-    if (!transport) {
-      res.status(404).send("Session not found");
+
+    const session = sessions.get(sessionId);
+    if (!session) {
+      res.status(404).json({ error: 'Session not found' });
       return;
     }
-    await transport.handlePostMessage(req, res);
+
+    console.log(`SSE channel open for session: ${sessionId}`);
+    await session.transport.handleRequest(req, res);
+  });
+
+  //DELETE /mcp -> tancar sessió
+  app.delete("/mcp", async (req, res) => {
+    const sessionId = req.headers['mcp-session-id'] as string;
+
+    if (!sessionId) {
+      res.status(400).json({ error: 'Mcp-Session-Id required' });
+      return;
+    }
+
+    const session = sessions.get(sessionId);
+    if (!session) {
+      res.status(404).json({ error: 'Session not found' });
+      return;
+    }
+
+    console.log(`clossing session: ${sessionId}`);
+    await session.server.close();
+    sessions.delete(sessionId);
+    res.status(200).end();
+  });
+
+  //no es part del standard mcp pero per fer proves va be
+  app.get("/health", (req, res) => {
+    res.json({
+      status: 'ok',
+      activeSessions: sessions.size,
+      timestamp: new Date().toISOString(),
+    });
   });
 
   return app;
@@ -71,34 +156,35 @@ export function createHttpServer() {
 
 async function startServer() {
   try {
-    console.log("Iniciando conexión con Odoo...");
+    console.log("Connecting to Odoo...");
     await odooClient.connect();
-    console.log("Conexión con Odoo establecida.");
+    console.log("Connexion to Odoo stablished");
 
     const app = createHttpServer();
     const PORT = process.env.PORT || 3000;
-    
-    console.log(`Levantando servidor en el puerto: ${PORT}...`);
 
-    // Guardamos la instancia del servidor
     const httpServer = app.listen(Number(PORT), "0.0.0.0", () => {
-      console.log(`Server running in SSE mode on port ${PORT}`);
+      console.log(`Server running in Streamable HTTP mode on port ${PORT}`);
+      console.log(`Endpoints:`);
+      console.log(`  POST   /mcp    - JSON-RPC messages`);
+      console.log(`  GET    /mcp    - SSE channel`);
+      console.log(`  DELETE /mcp    - Close session`);
+      console.log(`  GET    /health - Health check`);
     });
 
-    // IMPORTANTE: Escuchar errores de arranque (puerto ocupado, permisos, etc)
     httpServer.on('error', (e: any) => {
-        if (e.code === 'EADDRINUSE') {
-            console.error(`ERROR: El puerto ${PORT} esta ocupado por otro proceso.`);
-        } else if (e.code === 'EACCES') {
-            console.error(`ERROR: no tienes permiso para usar el puerto ${PORT}.`);
-        } else {
-            console.error('error en el servidor HTTP:', e);
-        }
-        process.exit(1);
+      if (e.code === 'EADDRINUSE') {
+        console.error(`ERROR: El puerto ${PORT} esta ocupado.`);
+      } else if (e.code === 'EACCES') {
+        console.error(`ERROR: No tienes permiso para usar el puerto ${PORT}.`);
+      } else {
+        console.error('Error en el servidor HTTP:', e);
+      }
+      process.exit(1);
     });
 
   } catch (error) {
-    console.error("fatal error en startServer:", error);
+    console.error("Fatal error en startServer:", error);
     process.exit(1);
   }
 }
@@ -106,5 +192,5 @@ async function startServer() {
 const isMainModule = process.argv[1] === fileURLToPath(import.meta.url);
 
 if (isMainModule) {
-    startServer();
+  startServer();
 }
