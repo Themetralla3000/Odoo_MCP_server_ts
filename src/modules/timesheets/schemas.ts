@@ -15,3 +15,9 @@ export const GetTaskTimesheetsSchema = z.object({
 });
 
 export type GetTaskTimesheetsInput = z.infer<typeof GetTaskTimesheetsSchema>;
+
+export const DeleteTimesheetInput = z.object({
+  timesheet_id: z.number().describe("ID del registro de timesheet a eliminar")
+});
+
+export type DeleteTimesheetInput = z.infer<typeof DeleteTimesheetInput>;

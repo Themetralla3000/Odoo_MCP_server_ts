@@ -1,5 +1,5 @@
 import { odooClient } from "../../core/odoo-client.js";
-import { CreateTimesheetInput, GetTaskTimesheetsInput } from "./schemas.js";
+import { CreateTimesheetInput, DeleteTimesheetInput, GetTaskTimesheetsInput } from "./schemas.js";
 
 export const TimesheetsService = {
   //escribir una linea de reporte de horas en una tarea
@@ -63,6 +63,34 @@ export const TimesheetsService = {
     } catch (error: any) {
       throw new Error(`Error consultando timesheets de la tarea ${args.task_id}: ${error.message || error}`);
     
+  }
+},
+
+async deleteTimesheetByTimesheetId(args: DeleteTimesheetInput) {
+  try {
+    const exists = await odooClient.execute(
+      'account.analytic.line',
+      'search',
+      [[['id', '=', args.timesheet_id]]]
+    );
+
+    if (!exists || exists.length === 0) {
+      throw new Error(`No se encontró el timesheet con ID ${args.timesheet_id}`);
+    }
+
+    const result = await odooClient.execute(
+      'account.analytic.line',
+      'unlink',
+      [args.timesheet_id]
+    );
+
+    return {
+      success: true,
+      message: `Timesheet ${args.timesheet_id} eliminado correctamente`,
+      deleted_id: args.timesheet_id
+    };
+  } catch (error: any) {
+    throw new Error(`Error al eliminar timesheet ${args.timesheet_id}: ${error.message || error}`);
   }
 }
 }
