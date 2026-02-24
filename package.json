@@ -9,7 +9,7 @@
   "start": "cross-env NODE_ENV=prod node build/src/index.js",
     "test": "cross-env NODE_ENV=test vitest run",
     "test:watch": "cross-env NODE_ENV=test vitest",
-    "test:integration": "cross-env NODE_ENV=test vitest run tests/integration",
+    "test:integration": "cross-env NODE_ENV=test vitest run --config vitest.integration.config.ts",
     "coverage": "cross-env NODE_ENV=test vitest run --coverage"
   },
   "dependencies": {
