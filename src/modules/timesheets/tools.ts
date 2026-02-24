@@ -1,6 +1,6 @@
 import { zodToJsonSchema } from "zod-to-json-schema";
 import { TimesheetsService } from "./service.js";
-import { CreateTimesheetSchema, GetTaskTimesheetsSchema } from "./schemas.js";
+import { CreateTimesheetSchema, GetTaskTimesheetsSchema, DeleteTimesheetInput } from "./schemas.js";
 //TODO: fix mongodb error on client 
 //el hecho de tener que hacer un fix para el cliente no es muy MCPlike de mi parte, pero de momento seguiré con ello
 export const timesheetsTools = [
@@ -49,5 +49,28 @@ export const timesheetsTools = [
         ]
       }
     }
-  }
+  },
+  {
+    definition: {
+      name: "timesheets_delete",
+      description: "Elimina un registro de horas (timesheet) por su ID.",
+      inputSchema: (() => {
+        const schema = zodToJsonSchema(DeleteTimesheetInput) as any;
+        delete schema.$schema;
+        return schema;
+      })(),
+    },
+    handler: async (args: any) => {
+      const validated = DeleteTimesheetInput.parse(args);
+      const result = await TimesheetsService.deleteTimesheetByTimesheetId(validated);
+      return {
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify(result, null, 2),
+          },
+        ],
+      };
+    },
+  },
 ];

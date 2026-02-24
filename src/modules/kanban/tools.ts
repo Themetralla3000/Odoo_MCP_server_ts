@@ -53,7 +53,6 @@ export const projectStateTools = [
       };
     },
   },
-  /*
   {
     definition: {
       name: "projects_search_by_state",
@@ -76,5 +75,5 @@ export const projectStateTools = [
         ],
       };
     },
-  },*/
+  },
 ];
