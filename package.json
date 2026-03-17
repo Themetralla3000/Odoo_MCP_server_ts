@@ -5,8 +5,11 @@
   "main": "build/src/index.js",
   "scripts": {
     "build": "tsc",
-   "dev": "cross-env NODE_ENV=dev ts-node build/src/index.js", 
-  "start": "cross-env NODE_ENV=prod node build/src/index.js",
+    "dev": "cross-env NODE_ENV=dev ts-node build/src/index.js",
+    "dev:stdio": "cross-env NODE_ENV=dev node build/src/index.js --stdio",
+    "start": "cross-env NODE_ENV=prod node build/src/index.js",
+    "start:http": "cross-env NODE_ENV=prod node build/src/index.js",
+    "start:stdio": "cross-env NODE_ENV=prod node build/src/index.js --stdio",
     "test": "cross-env NODE_ENV=test vitest run",
     "test:watch": "cross-env NODE_ENV=test vitest",
     "test:integration": "cross-env NODE_ENV=test vitest run --config vitest.integration.config.ts",

@@ -1,6 +1,6 @@
 # Odoo MCP Server
 
-> Servidor [Model Context Protocol (MCP)](https://modelcontextprotocol.io) per a Odoo, implementat amb Node.js / TypeScript i transport Streamable HTTP.
+> Servidor [Model Context Protocol (MCP)](https://modelcontextprotocol.io) per a Odoo, implementat amb Node.js / TypeScript. Suporta dos transports: **Streamable HTTP** (per a agents remots) i **stdio** (per a integració directa amb Claude Desktop o Claude Code).
 
 Part del TFG *"Desenvolupament d'un Agent Intel·ligent per a la Gestió i Suport de Processos Empresarials mitjançant MCP"* — TecnoCampus / UPF 2025–2026.
 
@@ -30,11 +30,18 @@ Aquest servidor exposa les dades d'**Odoo** com a eines MCP consumibles per qual
 - Registrar, consultar i eliminar imputacions d'hores (*timesheets*)
 - Llegir i actualitzar l'estat kanban dels projectes
 
-La comunicació amb Odoo es realitza via **XML-RPC 2.0** (l'API nativa d'Odoo). El servidor implementa el transport **Streamable HTTP** de l'especificació MCP, amb gestió de sessions stateful mitjançant UUID.
+La comunicació amb Odoo es realitza via **XML-RPC 2.0** (l'API nativa d'Odoo). El servidor suporta dos modes de transport MCP:
+
+- **Streamable HTTP** — sessions stateful via UUID, ideal per a agents remots i desplegaments multi-client
+- **stdio** — comunicació per entrada/sortida estàndard, ideal per a integració local amb Claude Desktop o Claude Code
 
 ---
 
 ## Arquitectura
+
+El servidor pot funcionar en dos modes de transport, seleccionables en temps d'execució.
+
+### Mode Streamable HTTP (per defecte)
 
 ```
 [LLM Host / Agent]
@@ -54,6 +61,20 @@ La comunicació amb Odoo es realitza via **XML-RPC 2.0** (l'API nativa d'Odoo). 
 | `GET`    | `/mcp`     | Canal SSE per a notificacions del servidor  |
 | `DELETE` | `/mcp`     | Tancament de sessió                         |
 | `GET`    | `/health`  | Estat del servidor i sessions actives       |
+
+### Mode stdio
+
+```
+[Claude Desktop / Claude Code]
+       │  stdin / stdout (JSON-RPC 2.0)
+       ▼
+[Odoo MCP Server]  ← procés fill, @modelcontextprotocol/sdk
+       │  XML-RPC 2.0
+       ▼
+[Odoo ERP]  ← instància cloud o on-premise
+```
+
+En mode stdio, el servidor llegeix missatges JSON-RPC des de `stdin` i escriu les respostes a `stdout`. Els logs es redirigeixen a `stderr` per no interferir amb el protocol.
 
 ---
 
@@ -103,19 +124,21 @@ NODE_ENV=prod  npm start   # .env.prod
 ```bash
 # Compilar
 npm run build
+```
 
-# Arrencar (producció)
-npm start
+### Mode Streamable HTTP (per defecte)
 
-# Arrencar (desenvolupament, NODE_ENV=dev)
-npm run dev
+```bash
+npm start           # producció
+npm run start:http  # equivalent explícit
+npm run dev         # desenvolupament (NODE_ENV=dev)
 ```
 
 En arrencar correctament veuràs:
 
 ```
 Connecting to Odoo...
-✅ Odoo Connected. UID: 42
+Connexion to Odoo stablished
 Server running in Streamable HTTP mode on port 3000
   POST   /mcp    - JSON-RPC messages
   GET    /mcp    - SSE channel
@@ -128,6 +151,53 @@ Pots verificar l'estat amb:
 ```bash
 curl http://localhost:3000/health
 # {"status":"ok","activeSessions":0,"timestamp":"..."}
+```
+
+### Mode stdio
+
+```bash
+npm run start:stdio   # producció
+npm run dev:stdio     # desenvolupament
+```
+
+O bé directament:
+
+```bash
+node build/src/index.js --stdio
+# o via variable d'entorn:
+MCP_TRANSPORT=stdio node build/src/index.js
+```
+
+**Integració amb Claude Desktop** (`claude_desktop_config.json`):
+
+```json
+{
+  "mcpServers": {
+    "odoo": {
+      "command": "node",
+      "args": ["/ruta/al/projecte/build/src/index.js", "--stdio"],
+      "env": {
+        "NODE_ENV": "prod"
+      }
+    }
+  }
+}
+```
+
+**Integració amb Claude Code** (fitxer `.mcp.json` al directori del projecte):
+
+```json
+{
+  "mcpServers": {
+    "odoo": {
+      "command": "node",
+      "args": ["build/src/index.js", "--stdio"],
+      "env": {
+        "NODE_ENV": "prod"
+      }
+    }
+  }
+}
 ```
 
 ---
