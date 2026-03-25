@@ -6,7 +6,7 @@ export const attachmentsTools = [
   {
     definition: {
       name: "attachments_get",
-      description: "Retrieves the file attachments (PDFs, images, etc.) linked to an Odoo task by its task_id. Returns file metadata and base64-encoded content.",
+      description: "Retrieves the file attachments (PDFs, images, etc.) linked to an Odoo task by its task_id. Downloads each file to a temporary directory and returns file metadata including the local file path, ready to be used by other tools (e.g. upload to Slack).",
       inputSchema: (() => {
         const schema = zodToJsonSchema(AttachmentGetSchema) as any;
         delete schema.$schema; // Fix MongoDB
