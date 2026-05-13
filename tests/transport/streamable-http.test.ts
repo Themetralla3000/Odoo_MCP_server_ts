@@ -119,7 +119,7 @@ describe('Transport Layer - Streamable HTTP /mcp', () => {
       expect(res.status).toBe(200);
       const body = parseSseResponse(res.text);
       expect(Array.isArray(body?.result?.tools)).toBe(true);
-      expect(body.result.tools).toHaveLength(10);
+      expect(body.result.tools).toHaveLength(12);
     });
 
     it('DELETE termina la sesión y devuelve 200', async () => {

@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { ZodError } from 'zod';
+import { SearchEmployeesSchema, GetEmployeesDetailsSchema } from '../../src/modules/employees/schemas.js';
 import { GetProjectsSchema } from '../../src/modules/projects/schemas.js';
 import { SearchTasksSchema } from '../../src/modules/tasks/schemas.js';
 import { SearchUsersSchema, GetUsersDetailsSchema } from '../../src/modules/users/schemas.js';
@@ -13,6 +14,42 @@ import {
   GetProjectStateInput,
   GetProjectsByStateInput,
 } from '../../src/modules/kanban/schemas.js';
+
+// --- employees ---
+
+describe('SearchEmployeesSchema', () => {
+  it('acepta input vacío con límite default 20', () => {
+    const result = SearchEmployeesSchema.parse({});
+    expect(result.limit).toBe(20);
+    expect(result.query).toBeUndefined();
+    expect(result.department).toBeUndefined();
+  });
+
+  it('acepta query y department opcionales', () => {
+    const result = SearchEmployeesSchema.parse({ query: 'Joan', department: 'IT' });
+    expect(result.query).toBe('Joan');
+    expect(result.department).toBe('IT');
+  });
+
+  it('rechaza límite no numérico', () => {
+    expect(() => SearchEmployeesSchema.parse({ limit: 'muchos' })).toThrow(ZodError);
+  });
+});
+
+describe('GetEmployeesDetailsSchema', () => {
+  it('acepta un array de ids numéricos', () => {
+    const result = GetEmployeesDetailsSchema.parse({ ids: [1, 5, 12] });
+    expect(result.ids).toEqual([1, 5, 12]);
+  });
+
+  it('rechaza sin el campo ids requerido', () => {
+    expect(() => GetEmployeesDetailsSchema.parse({})).toThrow(ZodError);
+  });
+
+  it('rechaza ids con strings en el array', () => {
+    expect(() => GetEmployeesDetailsSchema.parse({ ids: ['uno'] })).toThrow(ZodError);
+  });
+});
 
 // --- projects ---
 
@@ -101,6 +138,12 @@ describe('CreateTimesheetSchema', () => {
 
   it('rechaza si falta hours', () => {
     expect(() => CreateTimesheetSchema.parse({ task_id: 1, description: 'x' })).toThrow(ZodError);
+  });
+
+  it('acepta employee_id en lugar de user_id', () => {
+    const result = CreateTimesheetSchema.parse({ task_id: 1, description: 'x', hours: 2, employee_id: 7 });
+    expect(result.employee_id).toBe(7);
+    expect(result.user_id).toBeUndefined();
   });
 });
 

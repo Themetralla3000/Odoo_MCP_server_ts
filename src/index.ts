@@ -2,6 +2,7 @@
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { CallToolRequestSchema, ListToolsRequestSchema } from "@modelcontextprotocol/sdk/types.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
+import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { isInitializeRequest } from "@modelcontextprotocol/sdk/types.js";
 import { odooClient } from "./core/odoo-client.js";
 import { registerAllTools } from "./all-tools.js";
@@ -189,8 +190,30 @@ async function startServer() {
   }
 }
 
+async function startStdioServer() {
+  try {
+    process.stderr.write("Connecting to Odoo...\n");
+    await odooClient.connect();
+    process.stderr.write("Connexion to Odoo stablished\n");
+
+    const server = createOdooServer();
+    const transport = new StdioServerTransport();
+
+    await server.connect(transport);
+    process.stderr.write("Server running in stdio mode\n");
+  } catch (error) {
+    process.stderr.write(`Fatal error in startStdioServer: ${error}\n`);
+    process.exit(1);
+  }
+}
+
 const isMainModule = process.argv[1] === fileURLToPath(import.meta.url);
+const isStdioMode = process.argv.includes('--stdio') || process.env.MCP_TRANSPORT === 'stdio';
 
 if (isMainModule) {
-  startServer();
+  if (isStdioMode) {
+    startStdioServer();
+  } else {
+    startServer();
+  }
 }
