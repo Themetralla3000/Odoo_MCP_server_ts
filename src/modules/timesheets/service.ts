@@ -16,9 +16,12 @@ export const TimesheetsService = {
       payload.date = args.date;
     }
     
-    //no he comprobado que pasa si no le paso user
+    if (args.employee_id) {
+      payload.employee_id = args.employee_id;
+    }
+
     if (args.user_id) {
-        payload.user_id = args.user_id;
+      payload.user_id = args.user_id;
     }
 
     try {
@@ -39,10 +42,11 @@ export const TimesheetsService = {
     try {
       //campos a buscar
       const fields = [
-        'date',        
-        'user_id',      
-        'name',         
-        'unit_amount'   
+        'date',
+        'employee_id',
+        'user_id',
+        'name',
+        'unit_amount',
       ];
       //dominio: que coincida el task id
       const domain = [['task_id', '=', args.task_id]];

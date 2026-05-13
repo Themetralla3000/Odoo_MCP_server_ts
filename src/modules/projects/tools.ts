@@ -6,7 +6,7 @@ export const projectsTools = [
   {
     definition: {
       name: "projects_get_list",
-      description: "Obtener lista de proyectos de Odoo con sus fechas (Montaje, Evento). Permite filtrar por etapa.",
+      description: "Obtener lista de proyectos de Odoo con sus fechas de montaje y evento. Los resultados se ordenan por fecha de creación descendente (los creados más recientemente primero), NO por fecha de evento. IMPORTANTE: el límite por defecto es 20, lo que puede excluir proyectos con eventos próximos si fueron creados hace tiempo. Si buscas proyectos activos o futuros, aumenta el límite a 50 o más para asegurarte de cubrir todos los proyectos relevantes.",
       //Sino le llega basura al cliente
      inputSchema: (() => {
         const schema = zodToJsonSchema(GetProjectsSchema) as any;

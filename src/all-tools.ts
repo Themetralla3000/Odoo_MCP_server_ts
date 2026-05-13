@@ -1,6 +1,7 @@
 import { projectsTools } from "./modules/projects/tools.js";
 import { tasksTools } from "./modules/tasks/tools.js";
 import { usersTools } from "./modules/users/tools.js";
+import { employeesTools } from "./modules/employees/tools.js";
 import { timesheetsTools } from "./modules/timesheets/tools.js";
 import { projectStateTools } from "./modules/kanban/tools.js";
 import { attachmentsTools } from "./modules/attachments/tools.js";
@@ -9,6 +10,7 @@ const ALL_TOOLS_WRAPPERS= [
     ...projectsTools,
     ...tasksTools,
     ...usersTools,
+    ...employeesTools,
     ...timesheetsTools,
     ...projectStateTools,
     ...attachmentsTools
